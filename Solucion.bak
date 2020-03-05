@@ -1,0 +1,29 @@
+#lang racket
+
+; Integrantes:
+; Juan Esteban Camargo Chacon - 1924984
+; Brayan
+; Sebastian
+
+; COMENTARIO por PROCEDIMIENTO QUE EXPLIQUE que realiza y PARA QUE lo realiza
+
+; 1) Disenar interpretador con la siguiente gramatica, operaciones notacion infija
+; 2) Definir ambiente inicial y modificar la funcion evaluar-exprsion para que acepte el ambiente
+;    Disenar una funcion llamada buscar-variable
+; 3) Implementar los booleanos
+; 4) Extender la gramatica con condicionales (if)
+; 5) Implementar Declaracion de Variables Locales (let)
+; 6) Extender la Gramatica para crear procedimientos ... proc-val
+; 7) Extender la Gramatica para evaluar Procedimientos
+; 8) Extender la Gramatica para incluir llamados recursivos
+; 9) Dibuje el arbol de sintaxis abstracta de los ejerciicios del punto 7
+; 10) Dibujar el diagrama de ambientes de los ejercicios del punto 7 ( tener en cuenta el ambiente inical del punto 1)
+; Utilizacion del lenguaje;
+; 11)
+;     a) Escribir un programa en su lenguaje de programacion que contenga un procedimiento que permita calcular el area de un circulo dado un radio ( a = pi * r^2 ) debe incluir valores flotantes en el lenguaje
+
+;     b) Escribir un programa en su lenguaje que contenga un procedimiento que permita calcular el factorial de un numero n
+
+;     c) Escribir un programa que contenga un procedimiento que permita calcular una multiplicacion de forma recursiva a traves de sumas
+
+;     d) Escribir un programa recursivo que permita sumar, restar , multiplicar dos numeros haciendo uso solamente dee add1 y sub1

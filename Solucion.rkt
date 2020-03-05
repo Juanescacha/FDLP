@@ -11,14 +11,14 @@
 ; 1) Disenar interpretador con la siguiente gramatica, operaciones notacion infija
 ; 2) Definir ambiente inicial y modificar la funcion evaluar-expresion para que acepte el ambiente
 ;    Disenar una funcion llamada buscar-variable
-; B3) Implementar los booleanos
-; B4) Extender la gramatica con condicionales (if)
+; 3) Implementar los booleanos
+; 4) Extender la gramatica con condicionales (if)
 ; 5) Implementar Declaracion de Variables Locales (let)
 ; 6) Extender la Gramatica para crear procedimientos ... proc-val
 ; 7) Extender la Gramatica para evaluar Procedimientos
 ; 8) Extender la Gramatica para incluir llamados recursivos
 ; B9) Dibuje el arbol de sintaxis abstracta de los ejerciicios del punto 7
-; 10) Dibujar el diagrama de ambientes de los ejercicios del punto 7 ( tener en cuenta el ambiente inical del punto 1)
+; B10) Dibujar el diagrama de ambientes de los ejercicios del punto 7 ( tener en cuenta el ambiente inical del punto 1)
 ; Utilizacion del lenguaje;
 ; 11)
 ;     Ba) Escribir un programa en su lenguaje de programacion que contenga un procedimiento que permita calcular el area de un circulo dado un radio ( a = pi * r^2 ) debe incluir valores flotantes en el lenguaje
@@ -51,8 +51,18 @@
 ;            := <primitiva-unaria> (expresion)
 ;               primapp-un-exp (exp)
 ;
+;            := if <expresion> then <expresion> else <expresion>
+;               if-exp (exp1 exp2 exp3)
+;
 ;            := let ( <indentificador> = <expresion> )* in <expresion>
 ;               <let-exp (ids rands body)>
+;
+;            := proc ( {<indentificador>}*(,)) <expresion>
+;               proc-exp (ids body)
+;
+;            := [ <expresion> {<expresion>}* ]
+;               <app-exp proc rands>
+;
 ;
 ;<primitiva-binaria> :=  + (primitiva-suma)
 ;
@@ -104,7 +114,11 @@
     (expresion (identificador) var-exp)
     (expresion ( "(" expresion primitiva-binaria expresion ")" ) primapp-bin-exp)
     (expresion (primitiva-unaria expresion) primapp-un-exp)
-    (expresion ("let" (arbno identificador "=" expresion) "in" expresion) let-exp)
+    (expresion ( "if" expresion "then" expresion "else" expresion) if-exp)
+    (expresion ("let" "(" (arbno identificador "=" expresion) ")" "in" expresion) let-exp)
+    (expresion ("proc" "(" (separated-list identificador ",") ")" expresion) proc-exp)
+    (expresion ( "[" expresion (arbno expresion) "]" ) app-exp)
+    (expresion ( "letrec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion) "in" expresion) letrec-exp)
     
     
     ; primitiva-binaria
@@ -162,12 +176,35 @@
 (define eval-expression
   (lambda (exp env)
     (cases expresion exp
+      
       (numero-lit (numero) numero)
+      
       (var-exp (id) (buscar-variable env id))
+      
       (primapp-bin-exp (exp1 pBinaria exp2) (apply-primapp-bin (eval-expression exp1 env) pBinaria (eval-expression exp2 env)))
+      
       (primapp-un-exp (pUnaria exp1) (apply-primapp-un pUnaria exp1))
+      
       (texto-lit (text) (string-trim text "\"" ))
+
+      (if-exp (test true false) (if (true-value? (eval-expression test env))
+                                    (eval-expression true env)
+                                    (eval-expression false env)))
+      
       (let-exp (ids rands body) (let ((args (eval-rands rands env))) (eval-expression body (extend-env ids args env))))
+      
+      (proc-exp (ids body) (closure ids body env))
+      
+      (app-exp (rator rands) (let
+                                 ((proc (eval-expression rator env))
+                                  (args (eval-rands rands env)))
+                                 (if (procval? proc)
+                                     (apply-procedure proc args)
+                                     (eopl:error 'eval-expression "Intento aplicar a un no precidimiento ~s" proc))))
+
+      (letrec-exp (proc-names ids bodies letrec-body)
+                  (eval-expression letrec-body
+                                   (extend-env-recursively proc-names ids bodies env)))
       )))
 
 ;***********************************************************************************
@@ -200,7 +237,11 @@
   (empty-env-record)
   (extended-env-record (syms (list-of symbol?))
                       (vals (list-of scheme-value?))
-                      (env environment?)))
+                      (env environment?))
+  (recursively-extended-env-record (proc-names (list-of symbol?))
+                                   (ids (list-of (list-of symbol?)))
+                                   (bodies (list-of expresion?))
+                                   (env environment?)))
 
 (define scheme-value? (lambda (v) #t))
 
@@ -214,6 +255,10 @@
 (define extend-env
   (lambda (syms vals env)
     (extended-env-record syms vals env)))
+
+(define extend-env-recursively
+  (lambda (proc-names ids bodies old-env)
+    (recursively-extended-env-record proc-names ids bodies old-env)))
 
 ; Ambiente Inicial
 
@@ -231,11 +276,20 @@
     (cases environment env
       (empty-env-record ()
                         (eopl:error 'apply-env "No se encontro ~s" sym))
+      
       (extended-env-record (syms vals env)
                            (let ((pos (list-find-position sym syms)))
                              (if (number? pos)
                                  (list-ref vals pos)
-                                 (buscar-variable env sym)))))))
+                                 (buscar-variable env sym))))
+      
+      (recursively-extended-env-record (proc-names ids bodies old-env)
+                                       (let ((pos (list-find-position sym proc-names)))
+                                         (if (number? pos)
+                                             (closure (list-ref ids pos)
+                                                      (list-ref bodies pos)
+                                                      env)
+                                             (buscar-variable old-env sym)))))))
 
 
 ;***********************************************************************************
@@ -269,4 +323,28 @@
   (lambda (rand env)
     (eval-expression rand env)))
 
+; true-value?: determina si un valor dado corresponde a un valor booleano falso o verdadero
+
+(define true-value?
+  (lambda (x)
+    (not (zero? x))))
+
 ;***********************************************************************************
+
+; PROCEDIMIENTOS
+
+; Definimos el tipo de dato Closure
+
+(define-datatype procval procval?
+  (closure
+   (ids (list-of symbol?))
+   (body expresion?)
+   (env environment?)))
+
+; Definimos apply-procedure que evalua el cuerpo de un procedimiento en el ambiente extendido correspondiente
+
+(define apply-procedure
+  (lambda (proc args)
+    (cases procval proc
+      (closure (ids body env) (eval-expression body (extend-env ids args env)))
+      )))
