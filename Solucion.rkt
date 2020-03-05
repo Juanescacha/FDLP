@@ -51,14 +51,14 @@
 ;            := <primitiva-unaria> (expresion)
 ;               primapp-un-exp (exp)
 ;
-;            := if <expresion> then <expresion> else <expresion>
-;               if-exp (exp1 exp2 exp3)
+;            := si <expresion> entonces <expresion> sino <expresion>
+;               condicional-exp (exp1 exp2 exp3)
 ;
-;            := let ( <indentificador> = <expresion> )* in <expresion>
-;               <let-exp (ids rands body)>
+;            := declarar ( {<indentificador> = <expresion>}*(;) ) <expresion>
+;               <variableLocal-exp (ids exps cuerpo)>
 ;
-;            := proc ( {<indentificador>}*(,)) <expresion>
-;               proc-exp (ids body)
+;            := procedimiento ( {<indentificador>}*(,)) haga <expresion> finProc
+;               procedimiento-exp (ids cuerpo)
 ;
 ;            := [ <expresion> {<expresion>}* ]
 ;               <app-exp proc rands>
@@ -114,9 +114,10 @@
     (expresion (identificador) var-exp)
     (expresion ( "(" expresion primitiva-binaria expresion ")" ) primapp-bin-exp)
     (expresion (primitiva-unaria expresion) primapp-un-exp)
-    (expresion ( "if" expresion "then" expresion "else" expresion) if-exp)
-    (expresion ("let" "(" (arbno identificador "=" expresion) ")" "in" expresion) let-exp)
-    (expresion ("proc" "(" (separated-list identificador ",") ")" expresion) proc-exp)
+    (expresion ( "si" expresion "entonces" expresion "sino" expresion "finSi") condicional-exp)
+    ;(expresion ("declarar" "(" (arbno identificador "=" expresion) ")" "in" expresion) variableLocal-exp)
+    (expresion ("declarar" "(" (separated-list identificador "=" expresion ";") ")" expresion) variableLocal-exp)
+    (expresion ("procedimiento" "(" (separated-list identificador ",") ")" "haga" expresion "finProc" ) procedimiento-exp)
     (expresion ( "[" expresion (arbno expresion) "]" ) app-exp)
     (expresion ( "letrec" (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion) "in" expresion) letrec-exp)
     
@@ -187,13 +188,13 @@
       
       (texto-lit (text) (string-trim text "\"" ))
 
-      (if-exp (test true false) (if (true-value? (eval-expression test env))
+      (condicional-exp (test true false) (if (true-value? (eval-expression test env))
                                     (eval-expression true env)
                                     (eval-expression false env)))
       
-      (let-exp (ids rands body) (let ((args (eval-rands rands env))) (eval-expression body (extend-env ids args env))))
+      (variableLocal-exp (ids rands body) (let ((args (eval-rands rands env))) (eval-expression body (extend-env ids args env))))
       
-      (proc-exp (ids body) (closure ids body env))
+      (procedimiento-exp (ids body) (cerradura ids body env))
       
       (app-exp (rator rands) (let
                                  ((proc (eval-expression rator env))
@@ -286,7 +287,7 @@
       (recursively-extended-env-record (proc-names ids bodies old-env)
                                        (let ((pos (list-find-position sym proc-names)))
                                          (if (number? pos)
-                                             (closure (list-ref ids pos)
+                                             (cerradura (list-ref ids pos)
                                                       (list-ref bodies pos)
                                                       env)
                                              (buscar-variable old-env sym)))))))
@@ -336,15 +337,15 @@
 ; Definimos el tipo de dato Closure
 
 (define-datatype procval procval?
-  (closure
-   (ids (list-of symbol?))
-   (body expresion?)
-   (env environment?)))
+  (cerradura
+   (lista-id (list-of symbol?))
+   (exp expresion?)
+   (amb environment?)))
 
 ; Definimos apply-procedure que evalua el cuerpo de un procedimiento en el ambiente extendido correspondiente
 
 (define apply-procedure
   (lambda (proc args)
     (cases procval proc
-      (closure (ids body env) (eval-expression body (extend-env ids args env)))
+      (cerradura (ids body env) (eval-expression body (extend-env ids args env)))
       )))
